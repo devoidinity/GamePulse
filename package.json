@@ -1,0 +1,30 @@
+{
+  "name": "gamepulse",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open-source, self-hosted, game-focused telemetry & analytics platform",
+  "license": "MIT",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "dev": "npm run dev --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "db:generate": "npm run db:generate -w @gamepulse/shared",
+    "db:migrate": "npm run db:migrate -w @gamepulse/shared",
+    "db:deploy": "npm run db:deploy -w @gamepulse/shared",
+    "db:seed": "npm run db:seed -w @gamepulse/shared"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.8",
+    "@vitest/coverage-v8": "^2.1.8"
+  }
+}
