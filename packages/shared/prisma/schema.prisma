@@ -1,0 +1,309 @@
+// GamePulse Prisma schema
+// -----------------------------------------------------------------------------
+// Design notes for scaling to 100M+ events:
+//  * `Event` is the hot, append-only table. All read paths filter by
+//    (projectId, timestamp) so every analytical index leads with those columns.
+//  * `PlayerDay` is a pre-aggregated "active player per day" table. Cohort
+//    retention is otherwise O(events); with PlayerDay it is O(active-days).
+//  * `DailyRollup` stores per-project/day counters the worker maintains
+//    incrementally so the Overview page never scans raw events.
+//  * `Event` is prepared for native PostgreSQL range partitioning by month on
+//    `timestamp` (see prisma/migrations/.../partitioning.sql). Prisma keeps a
+//    flat model; partitioning is applied at the SQL level on the same columns.
+//  * Heavy text columns avoided on Event; payloads live in a single JSONB.
+// -----------------------------------------------------------------------------
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [pgcrypto]
+}
+
+enum Role {
+  OWNER
+  ADMIN
+  ANALYST
+  READONLY
+}
+
+enum InsightType {
+  DEAD_UPGRADE          // upgrade bought by < threshold% of players
+  LEVEL_DROPOFF         // abnormal drop-off at a progression level
+  UNSPENT_CURRENCY      // currency earned but (almost) never spent
+  UNUSED_ITEM           // item never used
+  ECONOMY_INFLATION     // currency accumulation trending up
+  DEAD_GENERATOR        // idle generator rarely purchased
+}
+
+enum InsightSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
+enum InsightStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+// ---------------------------------------------------------------------------
+// Tenancy & identity
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  memberships Membership[]
+  projects    Project[]
+
+  @@map("organizations")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  memberships   Membership[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model Membership {
+  id             String       @id @default(cuid())
+  userId         String
+  organizationId String
+  role           Role         @default(READONLY)
+  createdAt      DateTime     @default(now())
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+  @@map("memberships")
+}
+
+model RefreshToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique // sha256 of the opaque refresh token
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Projects & SDK keys
+// ---------------------------------------------------------------------------
+
+model Project {
+  id             String   @id @default(cuid())
+  organizationId String
+  name           String
+  // Display-only prefix of the active ingestion key (e.g. "gp_live_a1b2").
+  // The full key is never stored in plaintext; hashes live in ApiKey.
+  apiKeyPrefix   String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  apiKeys      ApiKey[]
+  players      Player[]
+  sessions     Session[]
+  events       Event[]
+  funnels      Funnel[]
+  insights     Insight[]
+  dailyRollups DailyRollup[]
+  playerDays   PlayerDay[]
+
+  @@index([organizationId])
+  @@map("projects")
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  projectId  String
+  name       String    @default("default")
+  prefix     String    // public, indexed lookup shortcut (e.g. "gp_live_a1b2")
+  hashedKey  String    @unique // sha256 of the full secret
+  lastUsedAt DateTime?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([prefix])
+  @@map("api_keys")
+}
+
+// ---------------------------------------------------------------------------
+// Telemetry core
+// ---------------------------------------------------------------------------
+
+model Player {
+  id               String   @id @default(cuid())
+  projectId        String
+  externalPlayerId String
+  firstSeenAt      DateTime @default(now())
+  lastSeenAt       DateTime @default(now())
+  createdAt        DateTime @default(now())
+
+  project  Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  sessions Session[]
+  events   Event[]
+
+  @@unique([projectId, externalPlayerId])
+  @@index([projectId, firstSeenAt]) // cohort assignment by signup day
+  @@map("players")
+}
+
+model Session {
+  id              String    @id @default(cuid())
+  projectId       String
+  playerId        String
+  externalId      String?   // client-provided session id, for dedupe
+  startedAt       DateTime  @default(now())
+  endedAt         DateTime?
+  durationSeconds Int?
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  player  Player  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  events  Event[]
+
+  @@unique([projectId, externalId])
+  @@index([projectId, startedAt])
+  @@index([playerId])
+  @@map("sessions")
+}
+
+model Event {
+  id         String   @id @default(cuid())
+  projectId  String
+  playerId   String
+  sessionId  String?
+  eventName  String
+  properties Json     @default("{}") // JSONB payload
+  timestamp  DateTime // client event time (authoritative for analytics)
+  receivedAt DateTime @default(now())
+
+  project Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  player  Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  session Session? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  // Read paths always lead with (projectId, timestamp).
+  @@index([projectId, timestamp])
+  @@index([projectId, eventName, timestamp])
+  @@index([projectId, playerId, timestamp])
+  @@map("events")
+}
+
+// ---------------------------------------------------------------------------
+// Idempotency
+// ---------------------------------------------------------------------------
+
+model IdempotencyKey {
+  id        String   @id @default(cuid())
+  projectId String
+  key       String
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, key])
+  @@index([createdAt]) // for TTL cleanup
+  @@map("idempotency_keys")
+}
+
+// ---------------------------------------------------------------------------
+// Aggregations (maintained by the worker)
+// ---------------------------------------------------------------------------
+
+// One row per (project, calendar day, player) — the retention backbone.
+model PlayerDay {
+  id        String   @id @default(cuid())
+  projectId String
+  playerId  String
+  date      DateTime @db.Date
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, playerId, date])
+  @@index([projectId, date])
+  @@map("player_days")
+}
+
+// One row per (project, calendar day) — powers the Overview page cheaply.
+model DailyRollup {
+  id              String   @id @default(cuid())
+  projectId       String
+  date            DateTime @db.Date
+  newPlayers      Int      @default(0)
+  activePlayers   Int      @default(0)
+  sessions        Int      @default(0)
+  events          Int      @default(0)
+  sessionSeconds  BigInt   @default(0) // sum, for avg session duration
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, date])
+  @@index([projectId, date])
+  @@map("daily_rollups")
+}
+
+// ---------------------------------------------------------------------------
+// Funnels & insights
+// ---------------------------------------------------------------------------
+
+model Funnel {
+  id        String   @id @default(cuid())
+  projectId String
+  name      String
+  steps     Json     // string[] of event names, ordered
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@map("funnels")
+}
+
+model Insight {
+  id          String          @id @default(cuid())
+  projectId   String
+  type        InsightType
+  severity    InsightSeverity @default(WARNING)
+  status      InsightStatus   @default(OPEN)
+  title       String
+  body        String
+  // dedupe fingerprint so the nightly job upserts instead of duplicating
+  fingerprint String
+  data        Json            @default("{}")
+  detectedAt  DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, fingerprint])
+  @@index([projectId, status])
+  @@index([projectId, detectedAt])
+  @@map("insights")
+}
