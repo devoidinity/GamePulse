@@ -8,7 +8,10 @@ import {
 } from "fastify-type-provider-zod";
 import { env } from "./config/env.js";
 import { registerErrorHandler } from "./plugins/errorHandler.js";
+import { authPlugin } from "./plugins/auth.js";
 import { healthRoutes } from "./routes/health.js";
+import { authRoutes } from "./routes/auth.js";
+import { projectRoutes } from "./routes/projects.js";
 
 export interface BuildAppOptions {
   /** Disable request logging in tests. */
@@ -54,8 +57,13 @@ export async function buildApp(
 
   registerErrorHandler(app);
 
+  // Auth decorators (authenticate / requireRole / authenticateApiKey).
+  await app.register(authPlugin);
+
   // --- Routes & modules (extended as features land) ---
   await app.register(healthRoutes);
+  await app.register(authRoutes, { prefix: "/api/v1/auth" });
+  await app.register(projectRoutes, { prefix: "/api/v1/projects" });
 
   return app;
 }
