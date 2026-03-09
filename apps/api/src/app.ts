@@ -1,6 +1,8 @@
 import Fastify, { type FastifyInstance } from "fastify";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
+import { redis } from "./lib/redis.js";
 import {
   serializerCompiler,
   validatorCompiler,
@@ -12,6 +14,7 @@ import { authPlugin } from "./plugins/auth.js";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
 import { projectRoutes } from "./routes/projects.js";
+import { eventRoutes } from "./routes/events.js";
 
 export interface BuildAppOptions {
   /** Disable request logging in tests. */
@@ -57,6 +60,15 @@ export async function buildApp(
 
   registerErrorHandler(app);
 
+  // Rate limiting (opt-in per route via config.rateLimit), backed by Redis so
+  // limits are shared across API replicas. Keyed by API key for ingestion.
+  await app.register(rateLimit, {
+    global: false,
+    redis: env.NODE_ENV === "test" ? undefined : redis,
+    keyGenerator: (req) =>
+      (req.headers["x-api-key"] as string) ?? req.ip,
+  });
+
   // Auth decorators (authenticate / requireRole / authenticateApiKey).
   await app.register(authPlugin);
 
@@ -64,6 +76,7 @@ export async function buildApp(
   await app.register(healthRoutes);
   await app.register(authRoutes, { prefix: "/api/v1/auth" });
   await app.register(projectRoutes, { prefix: "/api/v1/projects" });
+  await app.register(eventRoutes, { prefix: "/api/v1" });
 
   return app;
 }
