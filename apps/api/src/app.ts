@@ -14,7 +14,9 @@ import { authPlugin } from "./plugins/auth.js";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
 import { projectRoutes } from "./routes/projects.js";
+import { playerRoutes } from "./routes/players.js";
 import { eventRoutes } from "./routes/events.js";
+import { analyticsRoutes } from "./routes/analytics/index.js";
 
 export interface BuildAppOptions {
   /** Disable request logging in tests. */
@@ -76,7 +78,9 @@ export async function buildApp(
   await app.register(healthRoutes);
   await app.register(authRoutes, { prefix: "/api/v1/auth" });
   await app.register(projectRoutes, { prefix: "/api/v1/projects" });
+  await app.register(playerRoutes, { prefix: "/api/v1/players" });
   await app.register(eventRoutes, { prefix: "/api/v1" });
+  await app.register(analyticsRoutes, { prefix: "/api/v1" });
 
   return app;
 }
