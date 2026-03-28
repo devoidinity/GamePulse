@@ -17,6 +17,7 @@ import { projectRoutes } from "./routes/projects.js";
 import { playerRoutes } from "./routes/players.js";
 import { eventRoutes } from "./routes/events.js";
 import { analyticsRoutes } from "./routes/analytics/index.js";
+import { insightRoutes } from "./routes/insights.js";
 
 export interface BuildAppOptions {
   /** Disable request logging in tests. */
@@ -81,6 +82,7 @@ export async function buildApp(
   await app.register(playerRoutes, { prefix: "/api/v1/players" });
   await app.register(eventRoutes, { prefix: "/api/v1" });
   await app.register(analyticsRoutes, { prefix: "/api/v1" });
+  await app.register(insightRoutes, { prefix: "/api/v1" });
 
   return app;
 }
