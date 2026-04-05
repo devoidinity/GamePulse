@@ -11,6 +11,7 @@ import {
 import { env } from "./config/env.js";
 import { registerErrorHandler } from "./plugins/errorHandler.js";
 import { authPlugin } from "./plugins/auth.js";
+import { registerOpenApi } from "./openapi.js";
 import { healthRoutes } from "./routes/health.js";
 import { authRoutes } from "./routes/auth.js";
 import { projectRoutes } from "./routes/projects.js";
@@ -62,6 +63,9 @@ export async function buildApp(
   });
 
   registerErrorHandler(app);
+
+  // OpenAPI must register before routes so it captures their Zod schemas.
+  await registerOpenApi(app);
 
   // Rate limiting (opt-in per route via config.rateLimit), backed by Redis so
   // limits are shared across API replicas. Keyed by API key for ingestion.
