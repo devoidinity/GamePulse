@@ -7,7 +7,7 @@ import { logger } from "./lib/logger.js";
 import { processIngestBatch } from "./processors/ingestProcessor.js";
 import { recomputeRollups } from "./processors/rollupProcessor.js";
 import { analyzeAllProjects } from "./processors/balanceAnalyzer.js";
-import { analyticsQueue, scheduleNightlyJobs } from "./lib/queue.js";
+import { analyticsQueue, bullConnection, scheduleNightlyJobs } from "./lib/queue.js";
 
 const workers: Worker[] = [];
 
@@ -22,7 +22,7 @@ function startIngestWorker(): Worker {
       );
       return result;
     },
-    { connection, concurrency: env.INGEST_CONCURRENCY },
+    { connection: bullConnection, concurrency: env.INGEST_CONCURRENCY },
   );
 
   worker.on("failed", (job, err) =>
@@ -43,7 +43,7 @@ function startAnalyticsWorker(): Worker {
       for (const p of projects) await recomputeRollups(p.id);
       if (job.name === ANALYTICS_JOB.BALANCE_ANALYZER) await analyzeAllProjects();
     },
-    { connection, concurrency: 1 },
+    { connection: bullConnection, concurrency: 1 },
   );
   worker.on("failed", (job, err) =>
     logger.error({ jobId: job?.id, err: err.message }, "analytics job failed"),

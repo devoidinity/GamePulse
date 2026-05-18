@@ -71,7 +71,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     },
     async (req, reply) => {
       await authService.logout(req.body.refreshToken);
-      return reply.status(204).send();
+      return reply.status(204).send(null);
     },
   );
 

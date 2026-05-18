@@ -33,7 +33,7 @@ export async function eventRoutes(app: FastifyInstance): Promise<void> {
         security: [{ apiKey: [] }],
         headers: z.object({ "idempotency-key": z.string().optional() }).passthrough(),
         body: ingestBatchSchema,
-        response: { 202: ingestResponseSchema },
+        response: { 200: ingestResponseSchema, 202: ingestResponseSchema },
       },
     },
     async (req, reply) => {

@@ -1,11 +1,11 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyError, FastifyInstance } from "fastify";
 import { AppError } from "@gamepulse/shared";
 import { ZodError } from "zod";
 import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
 
 /** Maps domain + validation errors to a stable JSON envelope. */
 export function registerErrorHandler(app: FastifyInstance): void {
-  app.setErrorHandler((error, request, reply) => {
+  app.setErrorHandler((error: FastifyError, request, reply) => {
     // Zod request-validation errors (from the type provider).
     if (hasZodFastifySchemaValidationErrors(error)) {
       return reply.status(400).send({

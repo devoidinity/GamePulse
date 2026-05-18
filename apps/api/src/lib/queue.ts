@@ -1,10 +1,13 @@
-import { Queue } from "bullmq";
+import { Queue, type ConnectionOptions } from "bullmq";
 import { QUEUE } from "@gamepulse/shared";
 import { redis } from "./redis.js";
 
+// BullMQ bundles its own ioredis copy; cast to bridge the duplicate types.
+const connection = redis as unknown as ConnectionOptions;
+
 /** Producer-side handle to the ingestion queue. Worker consumes it. */
 export const ingestQueue = new Queue(QUEUE.INGEST, {
-  connection: redis,
+  connection,
   defaultJobOptions: {
     attempts: 5,
     backoff: { type: "exponential", delay: 1000 },

@@ -1,9 +1,12 @@
-import { Queue } from "bullmq";
+import { Queue, type ConnectionOptions } from "bullmq";
 import { QUEUE, ANALYTICS_JOB } from "@gamepulse/shared";
 import { connection } from "./redis.js";
 import { env } from "../config/env.js";
 
-export const analyticsQueue = new Queue(QUEUE.ANALYTICS, { connection });
+// BullMQ bundles its own ioredis copy; cast to bridge the duplicate types.
+export const bullConnection = connection as unknown as ConnectionOptions;
+
+export const analyticsQueue = new Queue(QUEUE.ANALYTICS, { connection: bullConnection });
 
 /**
  * Registers the nightly repeatable job (idempotent — BullMQ dedupes by the
