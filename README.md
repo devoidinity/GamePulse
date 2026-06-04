@@ -1,18 +1,27 @@
-# GamePulse
+# 🎮 GamePulse
 
-**Open-source, self-hosted telemetry & analytics built for games** — indie,
-idle/incremental, roguelikes, mobile, and simulation. Instead of generic product
-analytics, GamePulse speaks your domain: player progression, retention, the game
-economy, upgrade balance, item usage, and session behavior.
+### 📊 Open-source, self-hosted telemetry & analytics built specifically for games. 
+Perfect for indie games, idle/incremental, roguelikes, mobile, and simulations.
 
-> Not trying to out-feature PostHog/Amplitude/GameAnalytics. Trying to answer
-> *"Is level 8 too hard?"* and *"Is my gold economy inflating?"* out of the box.
+Instead of generic web-product analytics, **GamePulse speaks your domain**: player progression, retention, game economy, upgrade balance, item usage, and session behavior. 
 
-**Status:** early MVP / alpha. The architecture and data model are stable and the
-core paths are tested, but APIs may still change before `1.0`. Read
-[Production & security](#production--security) before self-hosting.
+We aren't trying to out-feature PostHog, Amplitude, or GameAnalytics. GamePulse is designed to answer real gamedev questions out of the box:
+* 📉 *“Is level 8 too hard?”*
+* 💰 *“Is my gold economy inflating?”*
+* ⚔️ *“Which upgrades are players ignoring?”*
 
-License: [MIT](LICENSE) · Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
+---
+
+### 🚀 Project Status: Early MVP / Alpha
+The architecture and data model are **stable** and the core paths are thoroughly tested. However, please note that **APIs may still change** before the 1.0 release. 
+
+⚠️ *Important:* Please read our **Production & Security** guide before self-hosting.
+
+---
+
+### 📄 License & Contributing
+* 📜 **License:** [MIT](LICENSE) — Free, loose, and commercial-friendly.
+* 🤝 **Contributing:** We love community help! Check out our [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 
 ---
 
