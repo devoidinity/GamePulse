@@ -1,0 +1,87 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Typecheck & unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema packages/shared/prisma/schema.prisma
+
+      - name: Build shared package
+        run: npm run build -w @gamepulse/shared
+
+      - name: Typecheck
+        run: npm run typecheck --workspaces --if-present
+
+      - name: Unit tests
+        run: npm test --workspaces --if-present
+
+  integration:
+    name: API integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: gamepulse
+          POSTGRES_PASSWORD: gamepulse
+          POSTGRES_DB: gamepulse_test
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U gamepulse"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://gamepulse:gamepulse@localhost:5432/gamepulse_test?schema=public
+      REDIS_URL: redis://localhost:6379
+      JWT_ACCESS_SECRET: ci-access-secret-0123456789abcdef0123456789
+      JWT_REFRESH_SECRET: ci-refresh-secret-0123456789abcdef0123456789
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate --schema packages/shared/prisma/schema.prisma
+
+      - name: Build shared package
+        run: npm run build -w @gamepulse/shared
+
+      - name: Apply database schema
+        run: npm run db:deploy -w @gamepulse/shared
+
+      - name: Run integration tests
+        run: RUN_INTEGRATION=1 npm test -w @gamepulse/api
