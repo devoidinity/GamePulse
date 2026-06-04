@@ -1,0 +1,55 @@
+name: Bug report
+description: Report something that isn't working as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to file a bug! Please search existing issues first.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start the stack with `docker compose up -d`
+        2. POST an event to /api/v1/events
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - API (apps/api)
+        - Worker (apps/worker)
+        - Dashboard (apps/dashboard)
+        - SDK (packages/sdk-js)
+        - Shared / schema (packages/shared)
+        - Infra / Docker
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: How are you running it, and which versions?
+      placeholder: |
+        - Run mode: docker compose / from source
+        - Node version: 24.x
+        - OS: ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste API/worker logs or error output (no secrets/API keys).
+      render: shell

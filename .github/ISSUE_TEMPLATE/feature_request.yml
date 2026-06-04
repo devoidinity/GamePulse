@@ -1,0 +1,36 @@
+name: Feature request
+description: Suggest an idea or improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What are you trying to do, and what's missing or painful today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like to see? Sketch the API/UX if you can.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - API (apps/api)
+        - Worker (apps/worker)
+        - Dashboard (apps/dashboard)
+        - SDK (packages/sdk-js)
+        - Shared / schema (packages/shared)
+        - Infra / Docker
+        - New SDK (Unity, Godot, ...)
+    validations:
+      required: true
