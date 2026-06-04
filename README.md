@@ -223,11 +223,29 @@ list; the most important:
 
 The MVP deliberately stops short of a few things; PRs welcome:
 
+**Product & features**
 - **Unity** and **Godot** SDKs (the ingestion contract already supports them).
 - Project member management UI (invites, role changes) — RBAC exists server-side.
 - Configurable insight thresholds per project.
 - Event schema registry / property typing.
 - Data retention & GDPR delete-by-player tooling.
+
+**Test automation & quality**
+- ✅ GitHub Actions CI: typecheck + unit tests on every push/PR, plus an
+  integration job with ephemeral Postgres + Redis. *(in progress)*
+- Coverage reporting with a minimum threshold gate (target ≥ 80%) enforced in CI.
+- End-to-end dashboard tests (Playwright) covering the auth + analytics flows.
+- SDK browser-matrix tests and a load/throughput test for the ingestion path.
+- Static analysis in CI: ESLint + Prettier checks and a Dependabot/`npm audit`
+  security gate.
+
+**CI/CD & releases**
+- Build and publish versioned Docker images (api / worker / dashboard) to GHCR
+  on tagged releases.
+- Automated, changelog-driven releases (Changesets / release-please) and npm
+  publishing of `@gamepulse/sdk-js`.
+- Preview/staging deployments per pull request.
+- Prisma migration checks in CI (drift detection + migrate-deploy dry run).
 
 AI-assisted insights are intentionally **out of scope** for the MVP — analysis is
 deterministic and rule-based.
