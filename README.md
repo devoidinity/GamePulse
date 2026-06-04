@@ -8,6 +8,12 @@ economy, upgrade balance, item usage, and session behavior.
 > Not trying to out-feature PostHog/Amplitude/GameAnalytics. Trying to answer
 > *"Is level 8 too hard?"* and *"Is my gold economy inflating?"* out of the box.
 
+**Status:** early MVP / alpha. The architecture and data model are stable and the
+core paths are tested, but APIs may still change before `1.0`. Read
+[Production & security](#production--security) before self-hosting.
+
+License: [MIT](LICENSE) · Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
+
 ---
 
 ## Highlights
@@ -60,12 +66,21 @@ economy, upgrade balance, item usage, and session behavior.
   events. Analytical indexes all lead with `(projectId, timestamp)`.
 - **One contract, no drift.** SDK and API import the same Zod schemas.
 
+## Prerequisites
+
+- **Docker** + Docker Compose v2 (for the one-command path), **or**
+- **Node.js ≥ 24** and **npm ≥ 9** plus a local PostgreSQL 14+ and Redis 6+
+  (for running from source).
+
 ## Quick start (Docker)
 
 ```bash
 cp .env.example .env          # adjust secrets for non-local use
 docker compose up -d          # postgres, redis, migrate, api, worker, dashboard
 ```
+
+`docker compose` reads `.env` automatically; the `migrate` service applies the
+schema before `api`/`worker` start.
 
 - Dashboard → http://localhost:3000
 - API + OpenAPI docs → http://localhost:4000/docs
@@ -82,6 +97,7 @@ docker compose run --rm migrate npm run db:seed -w @gamepulse/shared
 
 ```bash
 npm install
+cp .env.example .env
 docker compose up -d postgres redis
 npm run db:deploy            # apply migrations
 npm run db:seed              # optional demo data
@@ -90,6 +106,11 @@ npm run dev -w @gamepulse/api        # :4000
 npm run dev -w @gamepulse/worker
 npm run dev -w @gamepulse/dashboard  # :3000
 ```
+
+> **Note:** the `db:*` scripts run inside `packages/shared`, so Prisma reads its
+> `.env` from there or from the process environment. Either copy `.env` into
+> `packages/shared/`, or export `DATABASE_URL` in your shell before running them
+> (`export DATABASE_URL=postgresql://gamepulse:gamepulse@localhost:5432/gamepulse`).
 
 ## API
 
@@ -159,6 +180,37 @@ Unit tests cover the SDK, the insight rules, shared contracts, and API
 crypto/util helpers. The Supertest integration suite exercises the full
 register → project → ingest → query path.
 
+## Configuration
+
+All services are configured via environment variables (validated at boot with
+Zod — a bad config fails fast). See [`.env.example`](.env.example) for the full
+list; the most important:
+
+| Variable | Default | Notes |
+| -------- | ------- | ----- |
+| `DATABASE_URL` | — | PostgreSQL connection string (required) |
+| `REDIS_URL` | — | Redis connection string (required) |
+| `JWT_ACCESS_SECRET` / `JWT_REFRESH_SECRET` | dev placeholders | **Change for production** |
+| `JWT_ACCESS_TTL` / `JWT_REFRESH_TTL` | `900` / `1209600` | seconds |
+| `API_PORT` / `API_HOST` | `4000` / `0.0.0.0` | API bind |
+| `CORS_ORIGIN` | `*` | Comma-separated allowlist; **restrict in production** |
+| `INGEST_RATE_LIMIT_MAX` / `INGEST_RATE_LIMIT_WINDOW` | `10000` / `1 minute` | per API key |
+| `INGEST_MAX_BATCH` | `500` | max events per request |
+| `ANALYZER_HOUR_UTC` | `3` | nightly balance-analyzer hour (worker) |
+| `NEXT_PUBLIC_API_URL` | `http://localhost:4000` | **Build-time** for the dashboard image |
+
+## Production & security
+
+- **Replace the JWT secrets** (`openssl rand -hex 48`) and use a real secrets
+  manager — the defaults in `.env.example` are for local dev only.
+- **Restrict `CORS_ORIGIN`** to your dashboard origin(s).
+- Terminate TLS at a reverse proxy in front of `api` and `dashboard`.
+- `NEXT_PUBLIC_API_URL` is inlined into the dashboard bundle at **build** time;
+  rebuild the dashboard image with `--build-arg NEXT_PUBLIC_API_URL=https://…`
+  for non-localhost deployments.
+- API keys are stored only as SHA-256 hashes; passwords as bcrypt; refresh
+  tokens are hashed, rotated on use, and revocable.
+
 ## Scaling notes
 
 - `events` is prepared for native monthly range partitioning — see
@@ -167,6 +219,31 @@ register → project → ingest → query path.
   rate limiter and queue are Redis-backed and shared.
 - All hot read paths are index-aligned to `(projectId, timestamp)`.
 
+## Roadmap
+
+The MVP deliberately stops short of a few things; PRs welcome:
+
+- **Unity** and **Godot** SDKs (the ingestion contract already supports them).
+- Project member management UI (invites, role changes) — RBAC exists server-side.
+- Configurable insight thresholds per project.
+- Event schema registry / property typing.
+- Data retention & GDPR delete-by-player tooling.
+
+AI-assisted insights are intentionally **out of scope** for the MVP — analysis is
+deterministic and rule-based.
+
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the dev
+setup, coding conventions, and how to run the test suite. Please open an issue to
+discuss substantial changes first.
+
+## Security
+
+Found a vulnerability? Please **do not** open a public issue — email the
+maintainers privately (see `CONTRIBUTING.md`) so it can be patched before
+disclosure.
+
 ## License
 
-MIT.
+[MIT](LICENSE) © 2026 GamePulse contributors.
