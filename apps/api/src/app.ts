@@ -57,9 +57,13 @@ export async function buildApp(
   app.setSerializerCompiler(serializerCompiler);
 
   await app.register(helmet, { contentSecurityPolicy: false });
+  // A wildcard origin with credentials is unsafe (and rejected by browsers).
+  // Auth is via bearer tokens, not cookies, so only enable credentials when the
+  // origin is explicitly restricted.
+  const wildcardCors = env.CORS_ORIGIN === "*";
   await app.register(cors, {
-    origin: env.CORS_ORIGIN === "*" ? true : env.CORS_ORIGIN.split(","),
-    credentials: true,
+    origin: wildcardCors ? true : env.CORS_ORIGIN.split(","),
+    credentials: !wildcardCors,
   });
 
   registerErrorHandler(app);

@@ -8,7 +8,7 @@ import {
   type Role,
 } from "@gamepulse/shared";
 import { verifyAccessToken } from "../lib/jwt.js";
-import { hashApiKey } from "../lib/apiKey.js";
+import { hashApiKey, safeHashEqual } from "../lib/apiKey.js";
 import { API_KEY_PREFIX } from "@gamepulse/shared";
 
 export interface AuthedUser {
@@ -105,7 +105,8 @@ export const authPlugin = fp(async (app: FastifyInstance) => {
       select: { id: true, hashedKey: true, projectId: true, project: { select: { organizationId: true } } },
     });
     const hashed = hashApiKey(raw);
-    const match = candidates.find((c) => c.hashedKey === hashed);
+    // Constant-time hash comparison to avoid leaking key bytes via timing.
+    const match = candidates.find((c) => safeHashEqual(c.hashedKey, hashed));
     if (!match) throw new UnauthorizedError("Invalid API key");
 
     req.apiKey = {

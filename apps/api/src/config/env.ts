@@ -17,6 +17,33 @@ const apiEnvSchema = baseEnvSchema.extend({
   CORS_ORIGIN: z.string().default("*"),
 });
 
+// Values shipped in .env.example — must never be used in production.
+const KNOWN_DEV_SECRETS = new Set([
+  "dev-access-secret-change-me-in-production-please",
+  "dev-refresh-secret-change-me-in-production-please",
+]);
+
+/**
+ * Refuse to boot in production with weak, default, or duplicated JWT secrets.
+ * In dev/test the short example secrets stay usable for convenience.
+ */
+export const apiEnvSchemaChecked = apiEnvSchema.superRefine((cfg, ctx) => {
+  if (cfg.NODE_ENV !== "production") return;
+
+  for (const key of ["JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"] as const) {
+    const value = cfg[key];
+    if (KNOWN_DEV_SECRETS.has(value)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: "must not use the example/default secret in production" });
+    }
+    if (value.length < 32) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: "must be at least 32 characters in production (openssl rand -hex 48)" });
+    }
+  }
+  if (cfg.JWT_ACCESS_SECRET === cfg.JWT_REFRESH_SECRET) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["JWT_REFRESH_SECRET"], message: "access and refresh secrets must differ" });
+  }
+});
+
 export type ApiEnv = z.infer<typeof apiEnvSchema>;
 
-export const env: ApiEnv = parseEnv(apiEnvSchema);
+export const env: ApiEnv = parseEnv(apiEnvSchemaChecked);
