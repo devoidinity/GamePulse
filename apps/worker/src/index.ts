@@ -7,6 +7,7 @@ import { logger } from "./lib/logger.js";
 import { processIngestBatch } from "./processors/ingestProcessor.js";
 import { recomputeRollups } from "./processors/rollupProcessor.js";
 import { analyzeAllProjects } from "./processors/balanceAnalyzer.js";
+import { pruneIdempotencyKeys } from "./processors/cleanupProcessor.js";
 import { analyticsQueue, bullConnection, scheduleNightlyJobs } from "./lib/queue.js";
 
 const workers: Worker[] = [];
@@ -36,9 +37,17 @@ function startAnalyticsWorker(): Worker {
   const worker = new Worker(
     QUEUE.ANALYTICS,
     async (job: Job) => {
+      logger.info({ name: job.name }, "running analytics job");
+
+      // Lightweight maintenance: prune expired idempotency keys only.
+      if (job.name === ANALYTICS_JOB.IDEMPOTENCY_CLEANUP) {
+        const removed = await pruneIdempotencyKeys();
+        logger.info({ removed }, "idempotency cleanup complete");
+        return;
+      }
+
       // The nightly job recomputes rollups for all projects, then runs the
       // rule-based balance analyzer to (re)generate insights.
-      logger.info({ name: job.name }, "running analytics job");
       const projects = await prisma.project.findMany({ select: { id: true } });
       for (const p of projects) await recomputeRollups(p.id);
       if (job.name === ANALYTICS_JOB.BALANCE_ANALYZER) await analyzeAllProjects();

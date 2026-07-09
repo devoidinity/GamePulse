@@ -12,6 +12,7 @@ export const QUEUE = {
 export const ANALYTICS_JOB = {
   ROLLUP: "daily-rollup",
   BALANCE_ANALYZER: "balance-analyzer",
+  IDEMPOTENCY_CLEANUP: "idempotency-cleanup",
 } as const;
 
 /** Conventional event names GamePulse understands natively. */
