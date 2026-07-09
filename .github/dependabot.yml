@@ -1,0 +1,26 @@
+version: 2
+updates:
+  # Root + workspaces share one lockfile, so npm updates are grouped here.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # Keep noise down: batch non-major updates together.
+      minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      # Major bumps reviewed manually (e.g. Recharts 3, Prisma majors).
+      - dependency-name: "*"
+        update-types: [version-update:semver-major]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
